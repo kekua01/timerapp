@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Timers</title>
+
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-wEmeIV1mKuiNpC+IOBjI7aAzPcEZeedi5yW5f2yOq55WWLwNGmvvx4Um1vskeMj0" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+	<script src="https://kit.fontawesome.com/656d6b4226.js" crossorigin="anonymous"></script>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+</head>
+
+<body>
+
+	<div class='row toprow'>
+		<div class="col-4">
+			<h1 class='header'>Timers</h1>
+		</div>
+
+		<div class='col-4'>
+			<div class='add-new'>
+				<span class='create-text'>Create new timer</span>
+				<span class='plus'>+</span>
+			</div>
+
+			<form class='timer-form'>
+				<label for="timername">Timer name:</label><br>
+				<input id = "timer_input" type="text" name="timername" placeholder="New timer">
+				<input id="submit_timer" type="submit" value="Submit">
+			</form>
+		</div>
+	</div>
+
+	<div class='timers-container'>
+
+		{% for timer in timers %}
+			<div class='timer-chunk' id='timer{{timer.id}}'>
+				<div class='row'>
+					<div class='col-3'>
+						<p class='timer-name'>{{ timer.name }}</p>
+					</div>
+					<div class='col-4'>
+						<p class='timer-mins'>{{ timer.minutes // 60}} hrs {{timer.minutes % 60}} mins</p>
+						<span class='timer-added' id='localadd{{timer.id}}'></span>
+					</div>
+					<div class='col-1'>
+						<i class="fas fa-pause control" id="control{{timer.id}}"></i>
+					</div>
+					<div class='col-4'>
+						<p class='start-button' id='start{{timer.id}}'>Start Timer</p>
+					</div>
+				</div>
+				<div class='row'>
+					<div class='col-4'>
+						<span class='delete' id='delete{{timer.id}}'>Delete</span>
+					</div>
+					<div class='col-5'>
+						<span class='see-log' id="dropdown{{timer.id}}">See logs <i id="arrow{{timer.id}}" class="fas fa-caret-right"></i></span>
+					</div>
+					<div class='col-3'>
+						<p class='save-button' id='save{{timer.id}}'>Save Entry</p>
+					</div>
+				</div>
+				<div class='logskrts' id='logs{{timer.id}}'>
+					<div class="row">
+						<div class='col-2'>Entry</div>
+						<div class='col-4'>Start time</div>
+						<div class='col-4'>End time</div>
+						<div class='col-2'>Worktime</div>
+					</div>
+					{% for log in timer.entries %}
+					<div class='row'>
+						<div class='col-2'>{{loop.index}}</div>
+						<div class='col-4'>{{log.start}}</div>
+						<div class='col-4'>{{log.end}}</div>
+						<div class='col-2'>{{log.worktime}} mins</div>
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+		{% endfor %}
+
+	</div>
+
+</body>
+
+<script>
+var ongoing_timer = false;
+var play = false;
+var timerID = null;
+$('.logskrts').hide();
+
+$('.plus').on('click', function() {
+	$('.timer-form').css('display', 'block');
+});
+
+$('.see-log').on('click', function() {
+	id = $(this).attr('id');
+	idnum = id.slice(-1);
+	$('#arrow' + idnum).toggleClass("fa-caret-down");
+	$('#arrow' + idnum).toggleClass("fa-caret-right");
+	$('#logs' + idnum).toggle();
+});
+
+$('#submit_timer').on('click', function() {
+	$.ajax({
+    	data : {
+        	name: $('#timer_input').val() 
+        },
+        	type: 'POST',
+            url: '/add',
+            dataType: 'json'
+        })
+        .done(function(data) {
+            if (data) {
+            	idname = data['hide']
+            	$('#' + idname).css('display', 'none');
+            }
+        });
+});
+
+$('.delete').on('click', function() {
+	id = $(this).attr('id');
+	$.ajax({
+    	data : {
+        	id: id
+        },
+        	type: 'POST',
+            url: '/delete',
+            dataType: 'json'
+        })
+        .done(function(data) {
+            if (data) {
+            	idname = data['hide']
+            	$('#' + idname).css('display', 'none');
+            }
+        });
+});
+
+$('.start-button').on('click', function() {
+	if (ongoing_timer) {
+		alert("First, please save your entry for any ongoing timer!");
+	}
+	else {
+		id = $(this).attr('id');
+		idnum = id.slice(-1);
+		$.ajax({
+	    	data : {
+	        	id: idnum
+	        },
+	        	type: 'POST',
+	            url: '/start',
+	            dataType: 'json'
+	        })
+        .done(function(data) {
+			ongoing_timer = true;
+			play = true;
+	
+			$('#control' + idnum).css('display', 'inline');
+			$('#start' + idnum).css('display', 'none');
+			$('#save' + idnum).css('display', 'inline');
+			running = 0;
+			var timerID = setInterval(function() {
+				if (play) {
+					running++;
+					$('#localadd' + idnum).text("+" + running);
+				}
+			}, 60 * 1000); 
+		});
+	}
+});
+
+$('.control').on('click', function() {
+	id = $(this).attr('id');
+	idnum = id.slice(-1);
+	if (play) {
+		$(this).toggleClass("fa-pause");
+		$(this).toggleClass("fa-play");
+		play = false;
+	}
+	else {
+		$(this).toggleClass("fa-play");
+		$(this).toggleClass("fa-pause");
+		play = true;
+	}
+	
+});
+
+$('.save-button').on('click', function() {
+	id = $(this).attr('id');
+	idnum = id.slice(-1);
+	$.ajax({
+    	data : {
+        	id: idnum,
+        	running: running
+        },
+        	type: 'POST',
+            url: '/save',
+            dataType: 'json'
+        })
+    .done(function(data) {
+		ongoing_timer = false;
+		play = false;
+		$('#control' + idnum).css('display', 'none')
+		$(this).css('display', 'none')
+		$('#start' + idnum).css('display', 'inline')
+		running = 0;
+		location.reload();
+	});
+	
+});
+
+
+</script>
+
+<style>
+body {
+	background: #636363;
+}
+
+.header { font-size: 55px; margin-left: 30px; text-decoration: underline;}
+.toprow { margin-top: 40px;}
+.add-new { padding: 20px 0 0 0; }
+.create-text {font-family: sans-serif; font-size: 26px; }
+.plus { font-size: 19px; line-height: 19px; border: 1px solid black; margin-left: 5px; padding: 0px 4px 1px 4px; border-radius: 4px; background: #c9c9c9; cursor: pointer;}
+.timer-form { display: none; margin-top: 10px; }
+.timers-container { width: 60%; margin-top: 50px; margin-left: 5%;}
+.timer-chunk { margin: 20px 0; border-bottom: 3px dashed black; padding-bottom: 15px;}
+.timer-name { text-transform: capitalize; font-size: 26px; }
+.timer-mins { font-size: 20px; margin-top: 8px;}
+.start-button {background: #e6e6e6; border: 1px solid black; margin-top: 10px; border-radius: 4px; font-size: 15px; text-align: center; cursor: pointer; width: 60%; transform: translateX(30%);}
+.see-log { text-align: center; cursor: pointer;}
+.fa-caret-right, .fa-caret-down { cursor: pointer; }
+.delete { cursor: pointer; color: #b52d28; margin-right: auto;}
+.time-added{color: blue;}
+.control { display: none; cursor: pointer;}
+.save-button { display: none; background: #e6e6e6; border: 1px solid black; border-radius: 4px; text-align: center; cursor: pointer; width: 60%; transform: translateX(30%);}
+.logskrts { border: 1px solid black; }
+
+
+</style>
+</html>
